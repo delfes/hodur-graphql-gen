@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>hodur</groupId>
-  <artifactId>graphql-gen</artifactId>
-  <version>0.1.0</version>
-  <name>graphql-gen</name>
+  <groupId>delfes</groupId>
+  <artifactId>hodur-graphql-gen</artifactId>
+  <version>0.3.0</version>
+  <name>hodur-graphql-gen</name>
   <dependencies>
     <dependency>
       <groupId>org.clojure</groupId>
@@ -22,7 +22,37 @@
       <version>0.1.5</version>
     </dependency>
   </dependencies>
+
+  <packaging>clojure</packaging>
+
+  <scm>
+    <connection>scm:git:git@github.com:delfes/hodur-graphql-gen.git</connection>
+    <developerConnection>scm:git:git@github.com:delfes/hodur-graphql-gen.git</developerConnection>
+    <url>https://github.com/delfes/hodur-graphql-gen</url>
+  </scm>
+
   <build>
+    <plugins>
+      <plugin>
+        <groupId>com.theoryinpractise</groupId>
+        <artifactId>clojure-maven-plugin</artifactId>
+        <version>1.8.1</version>
+        <extensions>true</extensions>
+        <configuration>
+          <warnOnReflection>true</warnOnReflection>
+          <temporaryOutputDirectory>true</temporaryOutputDirectory>
+          <sourceDirectories>
+            <sourceDirectory>src</sourceDirectory>
+          </sourceDirectories>
+        </configuration>
+        <executions>
+          <execution>
+            <id>clojure-compile</id>
+            <phase>none</phase>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
     <sourceDirectory>src</sourceDirectory>
   </build>
 
