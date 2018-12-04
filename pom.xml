@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>hodur</groupId>
+  <artifactId>graphql-gen</artifactId>
+  <version>0.1.0</version>
+  <name>graphql-gen</name>
+  <dependencies>
+    <dependency>
+      <groupId>org.clojure</groupId>
+      <artifactId>clojure</artifactId>
+      <version>1.9.0</version>
+    </dependency>
+    <dependency>
+      <groupId>datascript</groupId>
+      <artifactId>datascript</artifactId>
+      <version>0.16.9</version>
+    </dependency>
+    <dependency>
+      <groupId>hodur</groupId>
+      <artifactId>engine</artifactId>
+      <version>0.1.5</version>
+    </dependency>
+  </dependencies>
+  <build>
+    <sourceDirectory>src</sourceDirectory>
+  </build>
+
+  <distributionManagement>
+    <repository>
+      <id>clojars</id>
+      <name>Clojars repository</name>
+      <url>https://clojars.org/repo</url>
+    </repository>
+  </distributionManagement>
+
+  <repositories>
+    <repository>
+      <id>clojars</id>
+      <url>https://repo.clojars.org/</url>
+    </repository>
+  </repositories>
+</project>
