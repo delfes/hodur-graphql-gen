@@ -124,7 +124,7 @@
               [FULL
                REGULATED]]))
 
-  (def ^:private root-type (first (loaders/load-queries @db)))
-  (deps/deps-for-type @db root-type)
+  (def root-type (first (loaders/load-queries db)))
+  (deps/deps-for-type db root-type)
 
-  (println (generate-full-query @db)))
+  (println (generate-full-query db)))

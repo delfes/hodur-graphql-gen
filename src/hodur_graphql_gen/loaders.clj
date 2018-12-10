@@ -13,7 +13,7 @@
          :where
          [?e :type/name ?name]
          [?e :type/nature :user]]
-       meta-db
+       @meta-db
        selector
        name))
 
@@ -23,7 +23,7 @@
          :where
          [?e :lacinia/tag true]
          [?e :type/name]]
-       meta-db
+       @meta-db
        selector))
 
 (defn load-queries [meta-db]
@@ -31,5 +31,5 @@
          :in $ ?selector
          :where
          [?e :lacinia/query true]]
-       meta-db
+       @meta-db
        selector))
