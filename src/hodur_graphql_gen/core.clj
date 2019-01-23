@@ -49,15 +49,30 @@
        (map params-list-field)
        flatten))
 
+(defn ^:private cardinality-one-to-one? [cardinality]
+  (and (= (first cardinality) 1)
+       (or (nil? (second cardinality))
+           (= (second cardinality) 1))))
+
+(defn ^:private field-type-string [field]
+  (let [base-type (-> field :param/type :type/name)
+        cardinality (:param/cardinality field)]
+    (if (or (nil? cardinality)
+            (cardinality-one-to-one? cardinality))
+      (str base-type
+           (when (not= (:param/optional field) true)
+             "!"))
+      (str "[" base-type "!]"
+           (when (not= (:param/optional field) true)
+             "!")))))
+
 (defn ^:private generate-params-for-field [[name arguments]]
   (map #(str "$"
              name
              "_"
              (:param/name %)
              ": "
-             (get-in % [:param/type :type/name])
-             (when (not= (:param/optional %) true)
-               "!"))
+             (field-type-string %))
        arguments))
 
 (defn ^:private generate-params-query [types]
@@ -95,36 +110,43 @@
 
 
 (comment
-  (def db (hodur-engine/init-schema
-            '[^:lacinia/tag
-              default
+  (let [db (hodur-engine/init-schema
+             '[^:lacinia/tag
+               default
 
-              ^:lacinia/query
-              QueryRoot
-              [^UserType findUser [^String namePattern]
-               ^{:type RegularUser
-                 :optional true} whoAmI]
+               ^:lacinia/query
+               QueryRoot
+               [^UserQueries users]
 
-              ^:union
-              UserType
-              [RegularUser
-               AdminUser]
+               UserQueries
+               [^UserType
+                findUser [^String namePattern]
+                ^{:type RegularUser
+                  :optional true}
+                whoAmI
+                ^{:type RegularUser
+                  :cardinality [0 n]}
+                findUsers [^{:type String
+                             :cardinality [0 n]} namePatternList]]
 
-              RegularUser
-              [^ID id
-               ^String name]
+               ^:union
+               UserType
+               [RegularUser
+                AdminUser]
 
-              AdminUser
-              [^ID id
-               ^String name
-               ^Permission permission]
+               RegularUser
+               [^ID id
+                ^String name]
 
-              ^:enum
-              Permission
-              [FULL
-               REGULATED]]))
+               AdminUser
+               [^ID id
+                ^String name
+                ^Permission permission]
 
-  (def root-type (first (loaders/load-queries db)))
-  (deps/deps-for-type db root-type)
-
-  (println (generate-full-query db)))
+               ^:enum
+               Permission
+               [FULL
+                REGULATED]])
+        root-type (first (loaders/load-queries db))]
+    #_(deps/deps-for-type db root-type)
+    (generate-full-query db)))
