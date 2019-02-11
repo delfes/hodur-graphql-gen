@@ -15,7 +15,7 @@
           (:field/_parent type)))
 
 (defn ^:private deps-for-typename [meta-db typename & [deps-set]]
-  (let [type (first (loaders/resolve-by-name meta-db typename))]
+  (let [type (loaders/resolve-by-name meta-db typename)]
     (deps-for-type meta-db type deps-set)))
 
 (defn ^:private deps-for-enum-type [type]

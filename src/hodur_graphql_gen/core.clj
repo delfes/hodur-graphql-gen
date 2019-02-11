@@ -20,7 +20,7 @@
 (defn ^:private generate-fragment-field [meta-db field]
   (let [field-name (:field/name field)
         field-type (or (:field/type field)
-                       (first (loaders/resolve-by-name meta-db field-name)))]
+                       (loaders/resolve-by-name meta-db field-name))]
     (if (or (= (:type/nature field-type) :primitive)
             (:type/enum field-type))
       (str field-name (generate-arguments field))
@@ -86,15 +86,27 @@
 (defn ^:private generate-query [meta-db type user-types]
   (let [fields (->> (:field/_parent type)
                     (map #(generate-fragment-field meta-db %)))]
-    (str "query("
+    (str "query ("
          (string/join ", " (flatten (generate-params-query user-types)))
          ") { "
          (string/join " "
                       (if (:type/union type)
                         (map #(str " ... on " %) fields)
                         fields))
-         "}")))
+         " }")))
 
+
+(defn ^:private generate-mutation [meta-db type user-types]
+  (let [fields (->> (:field/_parent type)
+                    (map #(generate-fragment-field meta-db %)))]
+    (str "mutation ("
+         (string/join ", " (flatten (generate-params-query (conj user-types type))))
+         ") { "
+         (string/join " "
+                      (if (:type/union type)
+                        (map #(str " ... on " %) fields)
+                        fields))
+         " }")))
 
 (defn generate-full-query [meta-db]
   (let [root-query (first (loaders/load-queries meta-db))
@@ -108,45 +120,68 @@
          "\n"
          (generate-query meta-db root-query user-types))))
 
+(defn generate-full-mutation [meta-db mutation-name]
+  (let [mutation-root (loaders/mutation-root meta-db)
+        filtered-mutation (->> (:field/_parent mutation-root)
+                               (filter #(= mutation-name (:field/name %)))
+                               (assoc mutation-root :field/_parent))
+        user-types (flatten (map #(loaders/resolve-by-name meta-db %)
+                                 (cset/difference (deps/deps-for-type meta-db filtered-mutation)
+                                                  #{(:type/name filtered-mutation)})))]
+    (str (string/join "\n"
+                      (->> user-types
+                           (filter #(not= (:type/enum %) true))
+                           (map #(generate-fragment meta-db %))))
+         "\n"
+         (generate-mutation meta-db filtered-mutation user-types))))
 
 (comment
-  (let [db (hodur-engine/init-schema
-             '[^:lacinia/tag
-               default
+  (def meta-db (hodur-engine/init-schema
+                 '[^:lacinia/tag
+                   default
 
-               ^:lacinia/query
-               QueryRoot
-               [^UserQueries users]
+                   ^:lacinia/query
+                   QueryRoot
+                   [^UserQueries users]
 
-               UserQueries
-               [^UserType
-                findUser [^String namePattern]
-                ^{:type RegularUser
-                  :optional true}
-                whoAmI
-                ^{:type RegularUser
-                  :cardinality [0 n]}
-                findUsers [^{:type String
-                             :cardinality [0 n]} namePatternList]]
+                   ^:lacinia/mutation
+                   MutationRoot
+                   [^RegularUser createUser [^String name]
+                    ^bool removeUser [^RegularUser user]]
 
-               ^:union
-               UserType
-               [RegularUser
-                AdminUser]
+                   UserQueries
+                   [^UserType
+                    findUser [^String namePattern]
+                    ^{:type RegularUser
+                      :cardinality [0 n]}
+                    findUsers [^{:type String
+                                 :cardinality [0 n]} namePatternList]]
 
-               RegularUser
-               [^ID id
-                ^String name]
+                   ^:union
+                   UserType
+                   [RegularUser
+                    AdminUser]
 
-               AdminUser
-               [^ID id
-                ^String name
-                ^Permission permission]
+                   Team
+                   [^AdminUser owner
+                    ^{:type RegularUser
+                      :cardinality [0 n]} participants]
 
-               ^:enum
-               Permission
-               [FULL
-                REGULATED]])
-        root-type (first (loaders/load-queries db))]
-    #_(deps/deps-for-type db root-type)
-    (generate-full-query db)))
+                   RegularUser
+                   [^ID id
+                    ^String name
+                    ^{:type Team
+                      :optional true} team]
+
+                   AdminUser
+                   [^ID id
+                    ^String name
+                    ^Permission permission]
+
+                   ^:enum
+                   Permission
+                   [FULL
+                    REGULATED]]))
+  (def root-type (first (loaders/load-queries meta-db)))
+  #_(deps/deps-for-type meta-db root-type)
+  (println (generate-full-query meta-db)))
