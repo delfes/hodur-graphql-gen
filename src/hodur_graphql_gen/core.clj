@@ -54,8 +54,22 @@
        (or (nil? (second cardinality))
            (= (second cardinality) 1))))
 
+(def ^:private primitive-type-map
+  {"String"   'String
+   "Integer"  'Int
+   "Float"    'Float
+   "Boolean"  'Boolean
+   "ID"       'ID
+   "DateTime" 'String})
+
+(defn ^:private get-type-reference
+  [{:keys [type/name type/nature]}]
+  (if (= :user nature)
+    name
+    (get primitive-type-map name)))
+
 (defn ^:private field-type-string [field]
-  (let [base-type (-> field :param/type :type/name)
+  (let [base-type (get-type-reference (:param/type field))
         cardinality (:param/cardinality field)]
     (if (or (nil? cardinality)
             (cardinality-one-to-one? cardinality))
@@ -155,7 +169,8 @@
                     ^{:type RegularUser
                       :cardinality [0 n]}
                     findUsers [^{:type String
-                                 :cardinality [0 n]} namePatternList]]
+                                 :cardinality [0 n]} namePatternList
+                               ^Integer maxResults]]
 
                    ^:union
                    UserType
