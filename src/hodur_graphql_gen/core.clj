@@ -122,8 +122,11 @@
                         fields))
          " }")))
 
-(defn generate-full-query [meta-db]
-  (let [root-query (first (loaders/load-queries meta-db))
+(defn generate-full-query [meta-db & [query-root]]
+  (let [root-query (cond-> (loaders/load-queries meta-db)
+                           true first
+                           (some? query-root) (update :field/_parent
+                                                      #(filter (comp #{query-root} :field/name) %)))
         user-types (flatten (map #(loaders/resolve-by-name meta-db %)
                                  (cset/difference (deps/deps-for-type meta-db root-query)
                                                   #{(:type/name root-query)})))]
@@ -156,7 +159,17 @@
 
                    ^:lacinia/query
                    QueryRoot
-                   [^UserQueries users]
+                   [^SystemQueries system
+                    ^UserQueries users]
+
+                   SystemQueries
+                   [^Boolean online
+                    ^Integer uptime
+                    ^SystemProps props]
+
+                   SystemProps
+                   [^String name
+                    ^Integer cpus]
 
                    ^:lacinia/mutation
                    MutationRoot
