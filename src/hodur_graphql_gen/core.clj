@@ -5,6 +5,14 @@
             [hodur-graphql-gen.loaders :as loaders]
             [hodur-engine.core :as hodur-engine]))
 
+(defn ^:private frag-name [obj]
+  (str "frag" (:type/name obj)))
+
+(defn ^:private obj-field [obj field-name]
+  (->> (:field/_parent obj)
+       (filter (comp #{field-name} :field/name))
+       first))
+
 (defn ^:private generate-arguments [field]
   (when (:param/_parent field)
     (str "("
@@ -26,14 +34,13 @@
       (str field-name (generate-arguments field))
       (str field-name (generate-arguments field)
            " { "
-           "...frag" (:type/name field-type)
+           "..." (frag-name field-type)
            " }"))))
 
 (defn ^:private generate-fragment [meta-db type]
-  (let [type-name (:type/name type)
-        fields (->> (:field/_parent type)
-                    (map #(generate-fragment-field meta-db %)))]
-    (str "fragment frag" type-name " on " type-name " { "
+  (let [fields (->> (:field/_parent type)
+                    (map (partial generate-fragment-field meta-db)))]
+    (str "fragment " (frag-name type) " on " (:type/name type) " { "
          (string/join " "
                       (if (:type/union type)
                         (map (partial str " ... on ") fields)
@@ -97,18 +104,49 @@
        (apply merge)
        (map generate-params-for-field)))
 
-(defn ^:private generate-query [meta-db type user-types]
-  (let [fields (->> (:field/_parent type)
-                    (map #(generate-fragment-field meta-db %)))]
-    (str "query ("
-         (string/join ", " (flatten (generate-params-query user-types)))
-         ") { "
-         (string/join " "
-                      (if (:type/union type)
-                        (map #(str " ... on " %) fields)
-                        fields))
-         " }")))
+(defn ^:private gen-field-query [mid-string obj-list fields-list]
+  (let [obj (first obj-list)
+        field-name (first fields-list)]
+    (if-let [field (obj-field obj field-name)]
+      (str " { "
+           field-name
+           (generate-arguments field)
+           (gen-field-query mid-string (rest obj-list) (rest fields-list))
+           " } ")
+      mid-string)))
 
+(defn ^:private params-for-fields [obj-list fields-list]
+  (let [obj (first obj-list)
+        field-name (first fields-list)]
+    (when-let [field (obj-field obj field-name)]
+      (cons (params-list-field field) (params-for-fields (rest obj-list)
+                                                         (rest fields-list))))))
+
+(defn ^:private generate-query [meta-db obj-list fields-list user-types]
+  (when-let [obj-type (last obj-list)]
+    (let [fields (->> (:field/_parent obj-type)
+                      (map (partial generate-fragment-field meta-db)))
+          query-args (->> (params-for-fields obj-list fields-list)
+                          flatten
+                          (remove nil?)
+                          (apply merge)
+                          (map generate-params-for-field)
+                          (concat (generate-params-query user-types))
+                          flatten
+                          (string/join ", "))]
+      (str "query "
+           (when-not (empty? query-args)
+             (str "(" query-args ")"))
+           (gen-field-query (str " { "
+                                 (if (empty? fields-list)
+                                   (string/join " "
+                                                (if (:type/union obj-type)
+                                                  (map (partial str " ... on ") fields)
+                                                  fields))
+                                   (str "..." (frag-name obj-type)))
+                                 " } ")
+                            obj-list
+                            fields-list)))))
 
 (defn ^:private generate-mutation [meta-db type user-types]
   (let [fields (->> (:field/_parent type)
@@ -122,19 +160,30 @@
                         fields))
          " }")))
 
-(defn generate-full-query [meta-db & [query-root]]
-  (let [root-query (cond-> (loaders/load-queries meta-db)
-                           true first
-                           (some? query-root) (update :field/_parent
-                                                      #(filter (comp #{query-root} :field/name) %)))
-        user-types (flatten (map #(loaders/resolve-by-name meta-db %)
-                                 (cset/difference (deps/deps-for-type meta-db root-query)
-                                                  #{(:type/name root-query)})))]
+(defn ^:private obj-path-list
+  ([meta-db fields-list]
+   (obj-path-list meta-db fields-list (first (loaders/load-queries meta-db))))
+  ([meta-db fields-list parent]
+   (let [obj (when-let [field (first fields-list)]
+               (when-let [typename (->> (obj-field parent field)
+                                        :field/type
+                                        :type/name)]
+                 (when-let [child (loaders/resolve-by-name meta-db typename)]
+                   (obj-path-list meta-db (rest fields-list) child))))]
+     (cons parent obj))))
+
+(defn generate-full-query [meta-db & [fields-list]]
+  (let [obj-list (obj-path-list meta-db fields-list)
+        root-query (last obj-list)
+        user-types (->> (cond-> (deps/deps-for-type meta-db root-query)
+                                (empty? fields-list) (cset/difference #{(:type/name root-query)}))
+                        (map (partial loaders/resolve-by-name meta-db))
+                        flatten)]
     (str (string/join "\n"
                       (->> (remove (comp true? :type/enum) user-types)
                            (map (partial generate-fragment meta-db))))
          "\n"
-         (generate-query meta-db root-query user-types))))
+         (generate-query meta-db obj-list fields-list user-types))))
 
 (defn generate-full-mutation [meta-db mutation-name]
   (let [mutation-root (loaders/mutation-root meta-db)
@@ -163,7 +212,7 @@
 
                    SystemQueries
                    [^Boolean online
-                    ^Integer uptime
+                    ^Integer uptime [^{:type Integer} timezone]
                     ^SystemProps props]
 
                    SystemProps
