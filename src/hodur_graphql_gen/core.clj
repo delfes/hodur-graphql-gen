@@ -8,7 +8,7 @@
 (defn ^:private generate-arguments [field]
   (when (:param/_parent field)
     (str "("
-         (string/join " "
+         (string/join ", "
                       (map #(str (:param/name %)
                                  ": $"
                                  (:field/name field)
@@ -36,7 +36,7 @@
     (str "fragment frag" type-name " on " type-name " { "
          (string/join " "
                       (if (:type/union type)
-                        (map #(str " ... on " %) fields)
+                        (map (partial str " ... on ") fields)
                         fields))
          " }")))
 
@@ -74,10 +74,10 @@
     (if (or (nil? cardinality)
             (cardinality-one-to-one? cardinality))
       (str base-type
-           (when (not= (:param/optional field) true)
+           (when-not (true? (:param/optional field))
              "!"))
       (str "[" base-type "!]"
-           (when (not= (:param/optional field) true)
+           (when-not (true? (:param/optional field))
              "!")))))
 
 (defn ^:private generate-params-for-field [[name arguments]]
@@ -93,7 +93,7 @@
   (->> types
        (map params-list)
        flatten
-       (filter some?)
+       (remove nil?)
        (apply merge)
        (map generate-params-for-field)))
 
@@ -112,13 +112,13 @@
 
 (defn ^:private generate-mutation [meta-db type user-types]
   (let [fields (->> (:field/_parent type)
-                    (map #(generate-fragment-field meta-db %)))]
+                    (map (partial generate-fragment-field meta-db)))]
     (str "mutation ("
          (string/join ", " (flatten (generate-params-query (conj user-types type))))
          ") { "
          (string/join " "
                       (if (:type/union type)
-                        (map #(str " ... on " %) fields)
+                        (map (partial str " ... on ") fields)
                         fields))
          " }")))
 
@@ -131,9 +131,8 @@
                                  (cset/difference (deps/deps-for-type meta-db root-query)
                                                   #{(:type/name root-query)})))]
     (str (string/join "\n"
-                      (->> user-types
-                           (filter #(not= (:type/enum %) true))
-                           (map #(generate-fragment meta-db %))))
+                      (->> (remove (comp true? :type/enum) user-types)
+                           (map (partial generate-fragment meta-db))))
          "\n"
          (generate-query meta-db root-query user-types))))
 
