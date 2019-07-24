@@ -35,11 +35,10 @@
        @meta-db
        selector))
 
-(defn mutation-root [meta-db]
-  (-> (d/q '[:find [(pull ?e ?selector) ...]
-             :in $ ?selector
-             :where
-             [?e :lacinia/mutation true]]
-           @meta-db
-           selector)
-      first))
+(defn load-mutations [meta-db]
+  (d/q '[:find [(pull ?e ?selector) ...]
+         :in $ ?selector
+         :where
+         [?e :lacinia/mutation true]]
+       @meta-db
+       selector))

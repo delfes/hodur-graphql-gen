@@ -186,7 +186,13 @@
          (generate-query meta-db obj-list fields-list user-types))))
 
 (defn generate-full-mutation [meta-db mutation-name]
-  (let [mutation-root (loaders/mutation-root meta-db)
+  (let [mutations (loaders/load-mutations meta-db)
+        mutation-root (first
+                        (filter
+                          (fn [mutation]
+                            (some (comp #{mutation-name} :field/name)
+                                  (:field/_parent mutation)))
+                          mutations))
         filtered-mutation (->> (:field/_parent mutation-root)
                                (filter #(= mutation-name (:field/name %)))
                                (assoc mutation-root :field/_parent))
@@ -210,6 +216,10 @@
                    [^SystemQueries system
                     ^UserQueries users]
 
+                   ^:lacinia/query
+                   QueryRoot
+                   [^RandomQueries random]
+
                    SystemQueries
                    [^Boolean online
                     ^Integer uptime [^{:type Integer} timezone]
@@ -219,10 +229,17 @@
                    [^String name
                     ^Integer cpus]
 
+                   RandomQueries
+                   [^String someInfo]
+
                    ^:lacinia/mutation
                    MutationRoot
                    [^RegularUser createUser [^String name]
                     ^bool removeUser [^RegularUser user]]
+
+                   ^:lacinia/mutation
+                   MngtMutationRoot
+                   [^bool clearUser [^String name]]
 
                    UserQueries
                    [^UserType
