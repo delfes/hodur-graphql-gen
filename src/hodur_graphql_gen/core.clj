@@ -39,6 +39,7 @@
 
 (defn ^:private generate-fragment [meta-db type]
   (let [fields (->> (:field/_parent type)
+                    (filter :lacinia/tag)
                     (map (partial generate-fragment-field meta-db)))]
     (str "fragment " (frag-name type) " on " (:type/name type) " { "
          (string/join " "
@@ -125,6 +126,7 @@
 (defn ^:private generate-query [meta-db obj-list fields-list user-types]
   (when-let [obj-type (last obj-list)]
     (let [fields (->> (:field/_parent obj-type)
+                      (filter :lacinia/tag)
                       (map (partial generate-fragment-field meta-db)))
           query-args (->> (params-for-fields obj-list fields-list)
                           flatten
@@ -181,6 +183,7 @@
                         flatten)]
     (str (string/join "\n"
                       (->> (remove (comp true? :type/enum) user-types)
+                           (filter :lacinia/tag)
                            (map (partial generate-fragment meta-db))))
          "\n"
          (generate-query meta-db obj-list fields-list user-types))))
@@ -216,14 +219,21 @@
                    [^SystemQueries system
                     ^UserQueries users]
 
+                   ^{:lacinia/tag false}
+                   NotLaciniaModel
+                   [^String someRandomValue]
+
                    ^:lacinia/query
                    QueryRoot
-                   [^RandomQueries random]
+                   [^RandomQueries random
+                    ^{:type NotLaciniaModel
+                      :lacinia/tag false} somethingElse]
 
                    SystemQueries
                    [^Boolean online
                     ^Integer uptime [^{:type Integer} timezone]
-                    ^SystemProps props]
+                    ^{:type SystemProps
+                      :lacinia/tag false} props]
 
                    SystemProps
                    [^String name
@@ -269,7 +279,9 @@
                    AdminUser
                    [^ID id
                     ^String name
-                    ^Permission permission]
+                    ^Permission permission
+                    ^{:type ID
+                      :lacinia/tag false} internalId]
 
                    ^:enum
                    Permission
