@@ -41,11 +41,14 @@
   (let [fields (->> (:field/_parent type)
                     (filter :lacinia/tag)
                     (map (partial generate-fragment-field meta-db)))]
-    (str "fragment " (frag-name type) " on " (:type/name type) " { "
-         (string/join " "
-                      (if (:type/union type)
-                        (map (partial str " ... on ") fields)
-                        fields))
+    (str "fragment " (frag-name type) " on " (:type/name type)
+         " { "
+         (if (empty? fields)
+           "__typename"
+           (string/join " "
+                        (if (:type/union type)
+                          (map (partial str " ... on ") fields)
+                          fields)))
          " }")))
 
 (defn ^:private params-list-field [field]
